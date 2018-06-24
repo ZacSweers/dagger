@@ -54,6 +54,10 @@ CODEGEN_SHARED_DEPS = [
 CODEGEN_DEPS = CODEGEN_SHARED_DEPS + [
     "@google_bazel_common//third_party/java/guava",
     ":shared-with-spi",
+    "@me_eugeniomarletti_kotlin_metadata_kotlin_metadata//jar",
+    "@me_eugeniomarletti_kotlin_metadata_kotlin_compiler_lite//jar",
+    "@org_jetbrains_kotlin_kotlin_stdlib//jar",
+    "@org_jetbrains_annotations//jar"
 ]
 
 # Code that is shared with the dagger.model and dagger.spi packages. This code is merged into both
@@ -127,6 +131,7 @@ java_library(
         "BindingTypeMapper.java",
         "BindingVariableNamer.java",  # needed by FrameworkField
         "BindsTypeChecker.java",
+        "CompanionObjectExecutableElement.java",
         "ComponentDescriptor.java",
         "ComponentRequirement.java",
         "ComponentTreeTraverser.java",

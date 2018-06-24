@@ -16,10 +16,6 @@
 
 package dagger.internal.codegen;
 
-import static com.google.auto.common.MoreElements.isAnnotationPresent;
-import static javax.lang.model.util.ElementFilter.methodsIn;
-import static javax.lang.model.util.ElementFilter.typesIn;
-
 import com.google.auto.common.BasicAnnotationProcessor.ProcessingStep;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.SetMultimap;
@@ -31,13 +27,25 @@ import dagger.internal.codegen.DelegateDeclaration.Factory;
 import dagger.producers.ProducerModule;
 import dagger.producers.Produces;
 import java.lang.annotation.Annotation;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.processing.Messager;
 import javax.inject.Inject;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import me.eugeniomarletti.kotlin.metadata.ClassData;
+import me.eugeniomarletti.kotlin.metadata.KotlinClassMetadata;
+import me.eugeniomarletti.kotlin.metadata.KotlinMetadata;
+import me.eugeniomarletti.kotlin.metadata.KotlinMetadataKt;
+import me.eugeniomarletti.kotlin.metadata.shadow.metadata.ProtoBuf;
+
+import static com.google.auto.common.MoreElements.isAnnotationPresent;
+import static javax.lang.model.util.ElementFilter.methodsIn;
+import static javax.lang.model.util.ElementFilter.typesIn;
 
 /**
  * A {@link ProcessingStep} that validates module classes and generates factories for binding
@@ -93,6 +101,32 @@ final class ModuleProcessingStep implements ProcessingStep {
     ValidationReport<TypeElement> report = moduleValidator.validate(module);
     report.printMessagesTo(messager);
     if (report.isClean()) {
+      List<ExecutableElement> methods = methodsIn(module.getEnclosedElements());
+      KotlinMetadata metadata = KotlinMetadataKt.getKotlinMetadata(module);
+      if (metadata instanceof KotlinClassMetadata) {
+        KotlinClassMetadata classMetadata = (KotlinClassMetadata) metadata;
+        ClassData classData = classMetadata.getData();
+        ProtoBuf.Class classProto = classMetadata.getData().getClassProto();
+        if (classProto.hasCompanionObjectName()) {
+          final String companionObjectName = classData.getNameResolver()
+              .getString(classProto.getCompanionObjectName());
+          Optional<TypeElement> optionalCompanionObject = typesIn(Collections.singleton(module))
+              .stream()
+              .filter(t -> t.getSimpleName().toString().equals(companionObjectName))
+              .findFirst();
+
+          if (optionalCompanionObject.isPresent()) {
+            TypeElement companionObject = optionalCompanionObject.get();
+            List<ExecutableElement> companionObjectMethods = methodsIn(companionObject.getEnclosedElements())
+                .stream()
+                .map(m -> new CompanionObjectExecutableElement(m, companionObjectName))
+                .collect(Collectors.toList());
+            methods.addAll(companionObjectMethods);
+          } else {
+            // TODO(zsweers) This case shouldn't be possible. How should we error?
+          }
+        }
+      }
       for (ExecutableElement method : methodsIn(module.getEnclosedElements())) {
         if (isAnnotationPresent(method, Provides.class)) {
           generate(factoryGenerator, bindingFactory.providesMethodBinding(method, module));
