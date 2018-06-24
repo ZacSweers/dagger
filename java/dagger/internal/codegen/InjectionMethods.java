@@ -471,7 +471,12 @@ final class InjectionMethods {
     }
     CodeBlock.Builder proxyInvocation = CodeBlock.builder();
     if (method.getModifiers().contains(STATIC)) {
-      proxyInvocation.add("$T", rawTypeName(TypeName.get(enclosingType.asType())));
+      if (method instanceof CompanionObjectExecutableElement) {
+        proxyInvocation.add("$T.$L", rawTypeName(TypeName.get(enclosingType.asType())),
+            ((CompanionObjectExecutableElement) method).companionObjectName);
+      } else {
+        proxyInvocation.add("$T", rawTypeName(TypeName.get(enclosingType.asType())));
+      }
     } else {
       copyTypeParameters(enclosingType, methodBuilder);
       // "instance" is guaranteed b/c it was the first name into the UniqueNameSet
